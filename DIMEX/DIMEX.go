@@ -186,6 +186,12 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 		  					    estado := estouNaSC
 
 	*/
+	module.nbrResps++
+	if module.nbrResps == len(module.addresses) {
+		<-module.Ind
+		module.st = inMX
+	}
+
 }
 
 // %GS: chamado quando recebe um ReqEntry
@@ -202,6 +208,11 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 		        				então  postergados := postergados + [p, r ]
 		     					lts.ts := max(lts.ts, rts.ts)
 	*/
+	// %GS: da onde vem o ID e timestamp do outro?
+	if module.st == noMX ||
+		(module.st == wantMX && before(0, 0, module.id, module.reqTs)) {
+
+	}
 }
 
 // ------------------------------------------------------------------------------------
