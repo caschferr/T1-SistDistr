@@ -31,7 +31,7 @@ import (
 
 type State int // enumeracao dos estados possiveis de um processo
 const (
-	noMX State = iota 	// %GS: iota = contador que vai 0, 1, 2, ...
+	noMX State = iota // %GS: iota = contador que vai 0, 1, 2, ...
 	wantMX
 	inMX
 )
@@ -142,6 +142,17 @@ func (module *DIMEX_Module) handleUponReqEntry() {
 							trigger [ pl , Send | [ reqEntry, r, myTs ]
 		    			estado := queroSC
 	*/
+	module.lcl++
+	module.reqTs = module.lcl
+	module.nbrResps = 0
+	for i := 0; i < len(module.addresses); i++ {
+		if i == module.id {
+			continue
+		}
+		module.sendToLink(module.addresses[i], "reqEntry", "naoseioqueissofaz")
+	}
+	module.st = wantMX
+
 }
 
 func (module *DIMEX_Module) handleUponReqExit() {
@@ -152,6 +163,11 @@ func (module *DIMEX_Module) handleUponReqExit() {
 		    				estado := naoQueroSC
 							waiting := {}
 	*/
+	for i := 0; i < len(module.waiting); i++ {
+		module.sendToLink(module.addresses[i], "respOk", "naoseioqueissofaz")
+	}
+	module.st = noMX
+	module.waiting = make([]bool, len(module.addresses))
 }
 
 // ------------------------------------------------------------------------------------
