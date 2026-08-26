@@ -50,8 +50,8 @@ func NewPP2PLink(_address string, _dbg bool) *PP2PLink {
 		Cache: make(map[string]net.Conn)}
 	p2p.outDbg(" Init PP2PLink!")
 	p2p.Start(_address)
-	go Envia(p2p)
-	go Recebe(p2p)
+	// go Envia(p2p)
+	// go Recebe(p2p) // erro de falta de parametro (falta serverPort string)
 	return p2p
 }
 

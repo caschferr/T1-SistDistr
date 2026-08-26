@@ -88,6 +88,7 @@ func NewDIMEX(_addresses []string, _id int, _dbg bool) *DIMEX_Module {
 	for i := 0; i < len(dmx.waiting); i++ {
 		dmx.waiting[i] = false
 	}
+	fmt.Printf("len(dmx.addresses) = %d\n", len(dmx.addresses))
 	dmx.Start()
 	dmx.outDbg("Init DIMEX!")
 	return dmx
@@ -103,25 +104,30 @@ func (module *DIMEX_Module) Start() {
 		for {
 			select {
 			case dmxR := <-module.Req: // vindo da  aplicação
-				if dmxR == ENTER {
-					module.outDbg("app pede mx")
-					module.handleUponReqEntry() // ENTRADA DO ALGORITMO
+				{
+					fmt.Println("dmxR recebeu module.Req")
+					if dmxR == ENTER {
+						module.outDbg("app pede mx")
+						module.handleUponReqEntry() // ENTRADA DO ALGORITMO
 
-				} else if dmxR == EXIT {
-					module.outDbg("app libera mx")
-					module.handleUponReqExit() // ENTRADA DO ALGORITMO
+					} else if dmxR == EXIT {
+						module.outDbg("app libera mx")
+						module.handleUponReqExit() // ENTRADA DO ALGORITMO
+					}
 				}
 
 			case msgOutro := <-module.Pp2plink.Ind: // vindo de outro processo
-				//fmt.Printf("dimex recebe da rede: ", msgOutro)
-				if strings.Contains(msgOutro.Message, "respOK") {
-					module.outDbg("         <<<---- responde! " + msgOutro.Message)
-					module.handleUponDeliverRespOk(msgOutro) // ENTRADA DO ALGORITMO
+				{
+					fmt.Printf("dimex recebe da rede: ", msgOutro)
+					if strings.Contains(msgOutro.Message, "respOk") {
+						module.outDbg("         <<<---- responde! " + msgOutro.Message)
+						module.handleUponDeliverRespOk(msgOutro) // ENTRADA DO ALGORITMO
 
-				} else if strings.Contains(msgOutro.Message, "reqEntry") {
-					module.outDbg("          <<<---- pede??  " + msgOutro.Message)
-					module.handleUponDeliverReqEntry(msgOutro) // ENTRADA DO ALGORITMO
+					} else if strings.Contains(msgOutro.Message, "reqEntry") {
+						module.outDbg("          <<<---- pede??  " + msgOutro.Message)
+						module.handleUponDeliverReqEntry(msgOutro) // ENTRADA DO ALGORITMO
 
+					}
 				}
 			}
 		}
@@ -151,7 +157,7 @@ func (module *DIMEX_Module) handleUponReqEntry() {
 		if i == module.id {
 			continue
 		}
-		module.sendToLink(module.addresses[i], "reqEntry "+fmt.Sprint(module.lcl)+" "+fmt.Sprint(module.id), "naoseioqueissofaz")
+		module.sendToLink(module.addresses[i], "reqEntry "+fmt.Sprint(module.lcl)+" "+fmt.Sprint(module.id), "space")
 	}
 	module.st = wantMX
 
@@ -167,11 +173,12 @@ func (module *DIMEX_Module) handleUponReqExit() {
 	*/
 	for i := 0; i < len(module.waiting); i++ {
 		if module.waiting[i] {
-			module.sendToLink(module.addresses[i], "respOk", "naoseioqueissofaz")
+			module.sendToLink(module.addresses[i], "respOk", "respOk (reqExit) from "+strconv.Itoa(module.id))
 		}
 	}
 	module.st = noMX
 	module.waiting = make([]bool, len(module.addresses))
+	fmt.Printf("module.waiting = %v\n", module.waiting)
 }
 
 // ------------------------------------------------------------------------------------
@@ -192,9 +199,9 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 	*/
 	module.nbrResps++
 	fmt.Printf("%d tem %d oks\n", module.id, module.nbrResps)
-	if module.nbrResps == len(module.addresses) {
+	if module.nbrResps == len(module.addresses)-1 {
 		fmt.Printf("%d pode entrar na seção crítica\n", module.id)
-		<-module.Ind
+		module.Ind <- dmxResp{}
 		module.st = inMX
 	}
 
@@ -226,7 +233,7 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 	if module.st == noMX ||
 		(module.st == wantMX && before(id_do_outro, lcl_do_outro, module.id, module.reqTs)) {
 		fmt.Printf("%d deixou %d passar na frente\n", module.id, id_do_outro)
-		module.sendToLink(module.addresses[id_do_outro], "respOk", "naoseioqueissofaz")
+		module.sendToLink(module.addresses[id_do_outro], "respOk", "respOk (reqEntry) from "+strconv.Itoa(module.id))
 	} else {
 		fmt.Printf("%d NÃO deixou %d passar na frente\n", module.id, id_do_outro)
 		// %GS: Quase certo que não é necessário esse if mas como está no algoritmo fica por enquanto
