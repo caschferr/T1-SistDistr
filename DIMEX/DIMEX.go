@@ -22,6 +22,8 @@ package DIMEX
 import (
 	PP2PLink "SD/PP2PLink"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 )
 
@@ -149,7 +151,7 @@ func (module *DIMEX_Module) handleUponReqEntry() {
 		if i == module.id {
 			continue
 		}
-		module.sendToLink(module.addresses[i], "reqEntry", "naoseioqueissofaz")
+		module.sendToLink(module.addresses[i], "reqEntry "+fmt.Sprint(module.lcl), "naoseioqueissofaz")
 	}
 	module.st = wantMX
 
@@ -164,7 +166,9 @@ func (module *DIMEX_Module) handleUponReqExit() {
 							waiting := {}
 	*/
 	for i := 0; i < len(module.waiting); i++ {
-		module.sendToLink(module.addresses[i], "respOk", "naoseioqueissofaz")
+		if module.waiting[i] {
+			module.sendToLink(module.addresses[i], "respOk", "naoseioqueissofaz")
+		}
 	}
 	module.st = noMX
 	module.waiting = make([]bool, len(module.addresses))
@@ -209,9 +213,30 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 		     					lts.ts := max(lts.ts, rts.ts)
 	*/
 	// %GS: da onde vem o ID e timestamp do outro?
+	id_do_outro := -1
+	for i := 0; i < len(module.addresses); i++ {
+		fmt.Printf("%s %s\n", msgOutro.From, module.addresses[i])
+		if module.addresses[i] == msgOutro.From {
+			id_do_outro = i
+		}
+	}
+	lcl_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
+	if err != nil {
+		println(err)
+	}
+	println()
+	println(lcl_do_outro)
+	println(id_do_outro)
 	if module.st == noMX ||
-		(module.st == wantMX && before(0, 0, module.id, module.reqTs)) {
-
+		(module.st == wantMX && before(id_do_outro, lcl_do_outro, module.id, module.reqTs)) {
+		module.sendToLink(module.addresses[id_do_outro], "respOk", "naoseioqueissofaz")
+	} else {
+		// %GS: Quase certo que não é necessário esse if mas como está no algoritmo fica por enquanto
+		if module.st == inMX || (module.st == wantMX && before(module.id, module.reqTs, id_do_outro, lcl_do_outro)) {
+			module.waiting[id_do_outro] = true
+		}
+		// %GS: tem que ter uma maneira mais bonita de fazer isso né...
+		module.lcl = int(math.Max(float64(module.lcl), 0))
 	}
 }
 
