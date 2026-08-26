@@ -31,6 +31,7 @@ package main
 import (
 	"SD/DIMEX"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -54,7 +55,7 @@ func main() {
 	fmt.Println(dmx)
 
 	// abre arquivo que TODOS processos devem poder usar
-	file, err := os.OpenFile("./mxOUT.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile("./mxOUT.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return
@@ -73,6 +74,19 @@ func main() {
 		<-dmx.Ind //
 
 		// A PARTIR DAQUI ESTA ACESSANDO O ARQUIVO SOZINHO
+		_, err := file.Seek(0, io.SeekEnd)
+		if err != nil {
+			panic("deu merda " + err.Error())
+		}
+		buf := make([]byte, 1)
+		_, err = file.Read(buf)
+		if err != nil && err != io.EOF {
+			panic("deu merda 2 o retorno " + err.Error())
+		}
+		if string(buf[0]) == "|" {
+			panic("REPEATED OUTPUT |")
+		}
+
 		_, err = file.WriteString("|") // marca entrada no arquivo
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
@@ -81,6 +95,18 @@ func main() {
 
 		fmt.Println("[ APP id: ", id, " *EM*   MX ]")
 
+		_, err = file.Seek(-1, io.SeekEnd)
+		if err != nil {
+			panic("deu merda " + err.Error())
+		}
+		buf = make([]byte, 1)
+		_, err = file.Read(buf)
+		if err != nil && err != io.EOF {
+			panic("deu merda 2 o retorno " + err.Error())
+		}
+		if string(buf[0]) == "." {
+			panic("REPEATED OUTPUT .")
+		}
 		_, err = file.WriteString(".") // marca saida no arquivo
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
