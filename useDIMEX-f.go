@@ -56,10 +56,19 @@ func main() {
 
 	// abre arquivo que TODOS processos devem poder usar
 	file, err := os.OpenFile("./mxOUT.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return
 	}
+
+	logFile, err := os.OpenFile("./log.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+
+	if err != nil {
+		fmt.Println("Error opening logFile:", err)
+		return
+	}
+	defer logFile.Close()
 	defer file.Close() // Ensure the file is closed at the end of the function
 
 	// espera para facilitar inicializacao de todos processos (a mao)
@@ -74,6 +83,8 @@ func main() {
 		<-dmx.Ind //
 
 		// A PARTIR DAQUI ESTA ACESSANDO O ARQUIVO SOZINHO
+		_, err = logFile.WriteString(strconv.Itoa(id) + " ")
+
 		_, err := file.Seek(0, io.SeekEnd)
 		if err != nil {
 			panic("deu merda " + err.Error())
@@ -84,6 +95,10 @@ func main() {
 			panic("deu merda 2 o retorno " + err.Error())
 		}
 		if string(buf[0]) == "|" {
+			_, err = logFile.WriteString("\nREPEATED | FROM ID " + strconv.Itoa(id))
+			if err != nil {
+				fmt.Println("Could not write to logFile")
+			}
 			panic("REPEATED OUTPUT |")
 		}
 
@@ -105,6 +120,10 @@ func main() {
 			panic("deu merda 2 o retorno " + err.Error())
 		}
 		if string(buf[0]) == "." {
+			_, err = logFile.WriteString("\nREPEATED . FROM ID " + strconv.Itoa(id))
+			if err != nil {
+				fmt.Println("Could not write to logFile")
+			}
 			panic("REPEATED OUTPUT .")
 		}
 		_, err = file.WriteString(".") // marca saida no arquivo
