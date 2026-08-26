@@ -50,6 +50,8 @@ func NewPP2PLink(_address string, _dbg bool) *PP2PLink {
 		Cache: make(map[string]net.Conn)}
 	p2p.outDbg(" Init PP2PLink!")
 	p2p.Start(_address)
+	go Envia(p2p)
+	go Recebe(p2p)
 	return p2p
 }
 
