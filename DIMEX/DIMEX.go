@@ -151,7 +151,7 @@ func (module *DIMEX_Module) handleUponReqEntry() {
 		if i == module.id {
 			continue
 		}
-		module.sendToLink(module.addresses[i], "reqEntry "+fmt.Sprint(module.lcl), "naoseioqueissofaz")
+		module.sendToLink(module.addresses[i], "reqEntry "+fmt.Sprint(module.lcl)+" "+fmt.Sprint(module.id), "naoseioqueissofaz")
 	}
 	module.st = wantMX
 
@@ -191,7 +191,9 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 
 	*/
 	module.nbrResps++
+	fmt.Printf("%d tem %d oks\n", module.id, module.nbrResps)
 	if module.nbrResps == len(module.addresses) {
+		fmt.Printf("%d pode entrar na seção crítica\n", module.id)
 		<-module.Ind
 		module.st = inMX
 	}
@@ -213,24 +215,20 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 		     					lts.ts := max(lts.ts, rts.ts)
 	*/
 	// %GS: da onde vem o ID e timestamp do outro?
-	id_do_outro := -1
-	for i := 0; i < len(module.addresses); i++ {
-		fmt.Printf("%s %s\n", msgOutro.From, module.addresses[i])
-		if module.addresses[i] == msgOutro.From {
-			id_do_outro = i
-		}
-	}
+	id_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[2])
 	lcl_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
 	if err != nil {
 		println(err)
 	}
-	println()
-	println(lcl_do_outro)
-	println(id_do_outro)
+	// println()
+	// println(lcl_do_outro)
+	// println(id_do_outro)
 	if module.st == noMX ||
 		(module.st == wantMX && before(id_do_outro, lcl_do_outro, module.id, module.reqTs)) {
+		fmt.Printf("%d deixou %d passar na frente\n", module.id, id_do_outro)
 		module.sendToLink(module.addresses[id_do_outro], "respOk", "naoseioqueissofaz")
 	} else {
+		fmt.Printf("%d NÃO deixou %d passar na frente\n", module.id, id_do_outro)
 		// %GS: Quase certo que não é necessário esse if mas como está no algoritmo fica por enquanto
 		if module.st == inMX || (module.st == wantMX && before(module.id, module.reqTs, id_do_outro, lcl_do_outro)) {
 			module.waiting[id_do_outro] = true
