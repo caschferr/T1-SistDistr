@@ -22,7 +22,6 @@ package DIMEX
 import (
 	PP2PLink "SD/PP2PLink"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 )
@@ -241,7 +240,12 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 			module.waiting[id_do_outro] = true
 		}
 		// %GS: tem que ter uma maneira mais bonita de fazer isso né...
-		module.lcl = int(math.Max(float64(module.lcl), 0))
+		//module.lcl = int(math.Max(float64(module.lcl), float64(lcl_do_outro)))
+
+		// %GS: reescrevendo a mesma coisa mas sem as conversões pra float e int
+		if module.lcl > lcl_do_outro {
+			module.lcl = lcl_do_outro
+		}
 	}
 }
 

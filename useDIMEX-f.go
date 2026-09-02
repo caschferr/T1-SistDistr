@@ -31,7 +31,6 @@ package main
 import (
 	"SD/DIMEX"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"time"
@@ -83,24 +82,24 @@ func main() {
 		<-dmx.Ind //
 
 		// A PARTIR DAQUI ESTA ACESSANDO O ARQUIVO SOZINHO
-		_, err = logFile.WriteString(strconv.Itoa(id) + " ")
+		// _, err = logFile.WriteString(strconv.Itoa(id) + " ")
 
-		_, err := file.Seek(0, io.SeekEnd)
-		if err != nil {
-			panic("deu merda " + err.Error())
-		}
-		buf := make([]byte, 1)
-		_, err = file.Read(buf)
-		if err != nil && err != io.EOF {
-			panic("deu merda 2 o retorno " + err.Error())
-		}
-		if string(buf[0]) == "|" {
-			_, err = logFile.WriteString("\nREPEATED | FROM ID " + strconv.Itoa(id))
-			if err != nil {
-				fmt.Println("Could not write to logFile")
-			}
-			panic("REPEATED OUTPUT |")
-		}
+		// _, err := file.Seek(0, io.SeekEnd)
+		// if err != nil {
+		// 	panic("deu merda " + err.Error())
+		// }
+		// buf := make([]byte, 1)
+		// _, err = file.Read(buf)
+		// if err != nil && err != io.EOF {
+		// 	panic("deu merda 2 o retorno " + err.Error())
+		// }
+		// if string(buf[0]) == "|" {
+		// 	_, err = logFile.WriteString("\nREPEATED | FROM ID " + strconv.Itoa(id))
+		// 	if err != nil {
+		// 		fmt.Println("Could not write to logFile")
+		// 	}
+		// 	panic("REPEATED OUTPUT |")
+		// }
 
 		_, err = file.WriteString("|") // marca entrada no arquivo
 		if err != nil {
@@ -110,22 +109,22 @@ func main() {
 
 		fmt.Println("[ APP id: ", id, " *EM*   MX ]")
 
-		_, err = file.Seek(-1, io.SeekEnd)
-		if err != nil {
-			panic("deu merda " + err.Error())
-		}
-		buf = make([]byte, 1)
-		_, err = file.Read(buf)
-		if err != nil && err != io.EOF {
-			panic("deu merda 2 o retorno " + err.Error())
-		}
-		if string(buf[0]) == "." {
-			_, err = logFile.WriteString("\nREPEATED . FROM ID " + strconv.Itoa(id))
-			if err != nil {
-				fmt.Println("Could not write to logFile")
-			}
-			panic("REPEATED OUTPUT .")
-		}
+		// _, err = file.Seek(-1, io.SeekEnd)
+		// if err != nil {
+		// 	panic("deu merda " + err.Error())
+		// }
+		// buf = make([]byte, 1)
+		// _, err = file.Read(buf)
+		// if err != nil && err != io.EOF {
+		// 	panic("deu merda 2 o retorno " + err.Error())
+		// }
+		// if string(buf[0]) == "." {
+		// 	_, err = logFile.WriteString("\nREPEATED . FROM ID " + strconv.Itoa(id))
+		// 	if err != nil {
+		// 		fmt.Println("Could not write to logFile")
+		// 	}
+		// 	panic("REPEATED OUTPUT .")
+		// }
 		_, err = file.WriteString(".") // marca saida no arquivo
 		if err != nil {
 			fmt.Println("Error writing to file:", err)

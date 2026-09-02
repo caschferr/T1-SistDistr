@@ -17,6 +17,8 @@ abrir_terminal() {
         xfce4-terminal -e "bash -c \"$cmd\""
     elif command -v xterm >/dev/null 2>&1; then
         xterm -e bash -c "$cmd" &
+    elif command -v alacritty >/dev/null 2>&1; then
+        alacritty -e bash -c "$cmd" &
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         osascript -e "tell application \"Terminal\" to do script \"$cmd\""
     else
