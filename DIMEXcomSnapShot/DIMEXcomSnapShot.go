@@ -42,6 +42,7 @@ type dmxReq int // enumeracao dos estados possiveis de um processo
 const (
 	ENTER dmxReq = iota
 	EXIT
+	SNAPSHOT // %GS: adicionando para pedir um snapshot
 )
 
 type dmxResp struct { // mensagem do módulo DIMEX infrmando que pode acessar - pode ser somente um sinal (vazio)
@@ -66,9 +67,11 @@ type DIMEX_Module struct {
 type SnapShot_Module struct { // GS: como modelar isso:
 	// um módulo paralelo que tem referência ao DIMEX?
 	// uma "sobrecarga" do DIMEX?
-	DIMEX    DIMEX_Module
-	file     os.File
-	received []bool // Para registrar de quais processos já recebeu o take snapshot
+	DIMEX       DIMEX_Module
+	file        os.File
+	received    []int // 0 = Nada, 1 = Enviou take snapshot e está esperando resposta, 2 = recebeu a resposta
+	ls          *localState
+	isRecording bool // %GS: flag para gravar mensagens
 	// Mais algo?
 }
 
@@ -77,6 +80,8 @@ type localState struct { // GS: Um tipo para conter as informações que vão se
 	lcl         int
 	reqTs       int
 	nbrResps    int
+	waiting     []bool
+	channels    []string
 }
 
 // ------------------------------------------------------------------------------------
@@ -113,12 +118,14 @@ func NewSnapShot_Module(_addresses []string, _id int, _dbg bool) *SnapShot_Modul
 	}
 
 	snp := &SnapShot_Module{
-		DIMEX:    *dmx,
-		file:     *file,
-		received: make([]bool, len(_addresses))}
+		DIMEX:       *dmx,
+		file:        *file,
+		ls:          nil,
+		isRecording: false,
+		received:    make([]int, len(_addresses))}
 
 	for i := 0; i < len(snp.received); i++ {
-		snp.received[i] = false
+		snp.received[i] = 0
 	}
 	fmt.Printf("len(dmx.addresses) = %d\n", len(dmx.addresses))
 	snp.Start()
@@ -145,11 +152,28 @@ func (module *SnapShot_Module) Start() {
 					} else if dmxR == EXIT {
 						module.DIMEX.outDbg("app libera mx")
 						module.DIMEX.handleUponReqExit() // ENTRADA DO ALGORITMO
+					} else if dmxR == SNAPSHOT {
+						// %GS: devia fazer exatamente igual e mandar uma mensagem pra si mesmo, mas não sei se isso aqui funciona
+						module.DIMEX.sendToLink(module.DIMEX.addresses[module.DIMEX.id], "takeSnapshot "+fmt.Sprint(module.DIMEX.id), "starting takeSnapshot")
 					}
 				}
 
 			case msgOutro := <-module.DIMEX.Pp2plink.Ind: // vindo de outro processo
 				{
+					if module.isRecording {
+						id_do_remetente := -1
+						for i := 0; i < len(module.DIMEX.addresses); i++ {
+							if module.DIMEX.addresses[i] == msgOutro.From {
+								id_do_remetente = i
+								break
+							}
+						}
+						if module.received[id_do_remetente] == 2 {
+							break // %GS: não grava se já recebeu a resposta desse remetente
+						}
+						// %GS: Salvando mensagem da forma mais básica possível
+						module.ls.channels[id_do_remetente] += msgOutro.Message + ";\n"
+					}
 					fmt.Printf("dimex recebe da rede: %s", msgOutro)
 					if strings.Contains(msgOutro.Message, "respOk") {
 						module.DIMEX.outDbg("         <<<---- responde! " + msgOutro.Message)
@@ -159,8 +183,8 @@ func (module *SnapShot_Module) Start() {
 						module.DIMEX.outDbg("          <<<---- pede??  " + msgOutro.Message)
 						module.DIMEX.handleUponDeliverReqEntry(msgOutro) // ENTRADA DO ALGORITMO
 
-					} else if strings.Contains(msgOutro.Message, "takeSnapShot") {
-						module.saveSnapShot() //Temporário
+					} else if strings.Contains(msgOutro.Message, "takeSnapshot") {
+						module.handleUponDeliverTakeSnapshot(msgOutro) // %GS: Entrada do snapshot
 					}
 				}
 			}
@@ -191,8 +215,67 @@ Protocolo de Chandy-Lamport (retirado direto dos slides)
     sua contribuição para o snapshot acaba.
     Este acaba pois a mensagem é enviada somente uma vez em cada canal de saída.
 */
-func (module *SnapShot_Module) saveSnapShot() {
+func (module *SnapShot_Module) handleUponDeliverTakeSnapshot(msgOutro PP2PLink.PP2PLink_Ind_Message) {
+	id_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
+	if err != nil {
+		println(err)
+	}
 
+	if module.received[id_do_outro] == 0 {
+		// É a primeira vez (pedido)
+		module.saveLocalState()
+		module.isRecording = true // %GS: passa a gravar mensagens nos canais
+		for i := 0; i < len(module.DIMEX.addresses); i++ {
+			module.ls.channels[i] = ""
+			if i == module.DIMEX.id {
+				module.received[id_do_outro] = 2 // Como não tem canal entre um processo e ele mesmo, só pula o estado 1
+				continue
+			}
+			module.DIMEX.sendToLink(module.DIMEX.addresses[i], "takeSnapshot "+fmt.Sprint(module.DIMEX.id), "takeSnapshot from "+strconv.Itoa(module.DIMEX.id))
+			module.received[id_do_outro] = 1
+		}
+	} else if module.received[id_do_outro] == 1 {
+		// Não é a primeira vez (resposta)
+		module.received[id_do_outro] = 2
+		module.checkSnapshotEnd()
+
+	}
+	// Se receber de um com estado 2, só ignora
+}
+
+func (module *SnapShot_Module) saveLocalState() {
+	ls := &localState{
+		DIMEX_State: module.DIMEX.st,
+		lcl:         module.DIMEX.lcl,
+		reqTs:       module.DIMEX.reqTs,
+		nbrResps:    module.DIMEX.nbrResps,
+		waiting:     module.DIMEX.waiting,
+		channels:    make([]string, len(module.DIMEX.addresses))}
+
+	module.ls = ls
+
+}
+
+func (module *SnapShot_Module) checkSnapshotEnd() {
+	for i := 0; i < len(module.DIMEX.addresses); i++ {
+		if module.received[i] != 2 {
+			return
+		}
+	}
+	// %GS: Se chegou aqui, então todos estão terminados
+	module.writeSnapshot()
+	// %GS: reinicia tudo e espera o próximo ciclo
+	for i := 0; i < len(module.DIMEX.addresses); i++ {
+		module.received[i] = 0
+	}
+}
+
+// %GS: Função só é chamada quando todos retornam, então se der postergação indefinida de um processo não vai ter snapshot...
+func (module *SnapShot_Module) writeSnapshot() {
+	module.file.WriteString()
+	for i := 0; i < len(module.received); i++ {
+		module.file.WriteString(module.ls.channels[i])
+	}
 }
 
 // ------------------------------------------------------------------------------------
