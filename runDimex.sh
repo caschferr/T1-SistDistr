@@ -1,13 +1,21 @@
 ARQUIVO="useDIMEX-f.go"
+ARQUIVOSNAP="useDIMEX-f-snap.go"
 ENDERECOS="127.0.0.1:5000 127.0.0.1:6001 127.0.0.1:7002"
 DIR_ATUAL="$(pwd)"
 
 rm mxOUT.txt
 rm log.txt
+rm snapshots_0.txt
+rm snapshots_1.txt
+rm snapshots_2.txt
 
 abrir_terminal() {
-    local id="$1"
-    local cmd="cd '$DIR_ATUAL' && go run $ARQUIVO $id $ENDERECOS; exec bash"
+    local id="$2"
+    if [ "$1" -eq "1" ]; then
+        local cmd="cd '$DIR_ATUAL' && go run $ARQUIVOSNAP $id $ENDERECOS; exec bash"
+    else
+        local cmd="cd '$DIR_ATUAL' && go run $ARQUIVO $id $ENDERECOS; exec bash"
+    fi
 
     if command -v gnome-terminal >/dev/null 2>&1; then
         gnome-terminal -- bash -c "$cmd"
@@ -28,6 +36,6 @@ abrir_terminal() {
 }
 
 for id in 0 1 2; do
-    abrir_terminal "$id"
+    abrir_terminal "$1" "$id"
     sleep 0.3
 done

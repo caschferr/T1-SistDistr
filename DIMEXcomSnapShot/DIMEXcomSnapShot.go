@@ -72,6 +72,7 @@ type SnapShot_Module struct { // GS: como modelar isso:
 	received    []int // 0 = Nada, 1 = Enviou take snapshot e está esperando resposta, 2 = recebeu a resposta
 	ls          *localState
 	isRecording bool // %GS: flag para gravar mensagens
+	dbg         bool
 	// Mais algo?
 }
 
@@ -88,7 +89,7 @@ type localState struct { // GS: Um tipo para conter as informações que vão se
 // ------- inicializacao
 // ------------------------------------------------------------------------------------
 
-func NewSnapShot_Module(_addresses []string, _id int, _dbg bool) *SnapShot_Module {
+func NewSnapShot_Module(_addresses []string, _id int, _dbg bool, _dbgDIMEX bool) *SnapShot_Module {
 
 	p2p := PP2PLink.NewPP2PLink(_addresses[_id], _dbg)
 
@@ -102,7 +103,7 @@ func NewSnapShot_Module(_addresses []string, _id int, _dbg bool) *SnapShot_Modul
 		waiting:   make([]bool, len(_addresses)),
 		lcl:       0,
 		reqTs:     0,
-		dbg:       _dbg,
+		dbg:       _dbgDIMEX,
 
 		Pp2plink: p2p}
 
@@ -110,7 +111,7 @@ func NewSnapShot_Module(_addresses []string, _id int, _dbg bool) *SnapShot_Modul
 		dmx.waiting[i] = false
 	}
 
-	file, err := os.OpenFile("./snapshots_{%s}.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	file, err := os.OpenFile(fmt.Sprintf("./snapshots_%d.txt", _id), os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -122,7 +123,8 @@ func NewSnapShot_Module(_addresses []string, _id int, _dbg bool) *SnapShot_Modul
 		file:        *file,
 		ls:          nil,
 		isRecording: false,
-		received:    make([]int, len(_addresses))}
+		received:    make([]int, len(_addresses)),
+		dbg:         _dbg}
 
 	for i := 0; i < len(snp.received); i++ {
 		snp.received[i] = 0
@@ -144,7 +146,7 @@ func (module *SnapShot_Module) Start() {
 			select {
 			case dmxR := <-module.DIMEX.Req: // vindo da  aplicação
 				{
-					fmt.Println("dmxR recebeu module.Req")
+					module.DIMEX.outDbg("dmxR recebeu module.Req")
 					if dmxR == ENTER {
 						module.DIMEX.outDbg("app pede mx")
 						module.DIMEX.handleUponReqEntry() // ENTRADA DO ALGORITMO
@@ -161,12 +163,9 @@ func (module *SnapShot_Module) Start() {
 			case msgOutro := <-module.DIMEX.Pp2plink.Ind: // vindo de outro processo
 				{
 					if module.isRecording {
-						id_do_remetente := -1
-						for i := 0; i < len(module.DIMEX.addresses); i++ {
-							if module.DIMEX.addresses[i] == msgOutro.From {
-								id_do_remetente = i
-								break
-							}
+						id_do_remetente, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
+						if err != nil {
+							println(err)
 						}
 						if module.received[id_do_remetente] == 2 {
 							break // %GS: não grava se já recebeu a resposta desse remetente
@@ -174,7 +173,7 @@ func (module *SnapShot_Module) Start() {
 						// %GS: Salvando mensagem da forma mais básica possível
 						module.ls.channels[id_do_remetente] += msgOutro.Message + ";\n"
 					}
-					fmt.Printf("dimex recebe da rede: %s", msgOutro)
+					//fmt.Printf("dimex recebe da rede: %s", msgOutro)
 					if strings.Contains(msgOutro.Message, "respOk") {
 						module.DIMEX.outDbg("         <<<---- responde! " + msgOutro.Message)
 						module.DIMEX.handleUponDeliverRespOk(msgOutro) // ENTRADA DO ALGORITMO
@@ -184,7 +183,9 @@ func (module *SnapShot_Module) Start() {
 						module.DIMEX.handleUponDeliverReqEntry(msgOutro) // ENTRADA DO ALGORITMO
 
 					} else if strings.Contains(msgOutro.Message, "takeSnapshot") {
+						module.outDbg("          <<<---- snapshot??  " + msgOutro.Message)
 						module.handleUponDeliverTakeSnapshot(msgOutro) // %GS: Entrada do snapshot
+						module.outDbg("Algo aconteceu")
 					}
 				}
 			}
@@ -217,28 +218,31 @@ Protocolo de Chandy-Lamport (retirado direto dos slides)
 */
 func (module *SnapShot_Module) handleUponDeliverTakeSnapshot(msgOutro PP2PLink.PP2PLink_Ind_Message) {
 	id_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
+	module.outDbg("Oi")
 	if err != nil {
 		println(err)
 	}
-
 	if module.received[id_do_outro] == 0 {
+		module.outDbg("Iniciando uma snapshot")
 		// É a primeira vez (pedido)
 		module.saveLocalState()
 		module.isRecording = true // %GS: passa a gravar mensagens nos canais
 		for i := 0; i < len(module.DIMEX.addresses); i++ {
 			module.ls.channels[i] = ""
 			if i == module.DIMEX.id {
-				module.received[id_do_outro] = 2 // Como não tem canal entre um processo e ele mesmo, só pula o estado 1
+				module.received[i] = 2 // Como não tem canal entre um processo e ele mesmo, só pula o estado 1
 				continue
 			}
+			module.outDbg("          requisita ---->>> " + msgOutro.Message)
 			module.DIMEX.sendToLink(module.DIMEX.addresses[i], "takeSnapshot "+fmt.Sprint(module.DIMEX.id), "takeSnapshot from "+strconv.Itoa(module.DIMEX.id))
-			module.received[id_do_outro] = 1
+			module.received[i] = 1
 		}
+		module.received[id_do_outro] = 2 // %GS: quem iniciou não vai responder, então não espera a resposta dele
 	} else if module.received[id_do_outro] == 1 {
+		module.outDbg("Mensagem de resposta recebida")
 		// Não é a primeira vez (resposta)
 		module.received[id_do_outro] = 2
 		module.checkSnapshotEnd()
-
 	}
 	// Se receber de um com estado 2, só ignora
 }
@@ -257,17 +261,25 @@ func (module *SnapShot_Module) saveLocalState() {
 }
 
 func (module *SnapShot_Module) checkSnapshotEnd() {
+	module.outDbg("Verificando se acabou")
+	for i := 0; i < len(module.DIMEX.addresses); i++ {
+		module.outDbg(fmt.Sprintf("%d", module.received[i]))
+	}
 	for i := 0; i < len(module.DIMEX.addresses); i++ {
 		if module.received[i] != 2 {
+			module.outDbg("Não acabou")
 			return
 		}
 	}
+	module.outDbg("Terminado uma snapshot, escrevendo...")
 	// %GS: Se chegou aqui, então todos estão terminados
 	module.writeSnapshot()
+	module.outDbg("Escrito")
 	// %GS: reinicia tudo e espera o próximo ciclo
 	for i := 0; i < len(module.DIMEX.addresses); i++ {
 		module.received[i] = 0
 	}
+	module.outDbg("Pronto pra próxima")
 }
 
 // %GS: Função só é chamada quando todos retornam, então se der postergação indefinida de um processo não vai ter snapshot...
@@ -280,7 +292,7 @@ func (module *SnapShot_Module) writeSnapshot() {
 	for i := 0; i < len(module.received); i++ {
 		module.file.WriteString(fmt.Sprintf("%t ", module.ls.waiting[i]))
 	}
-
+	module.file.WriteString("waiting: \n")
 	for i := 0; i < len(module.received); i++ {
 		module.file.WriteString(module.ls.channels[i])
 	}
@@ -311,7 +323,7 @@ func (module *DIMEX_Module) handleUponReqEntry() {
 		if i == module.id {
 			continue
 		}
-		module.sendToLink(module.addresses[i], "reqEntry "+fmt.Sprint(module.lcl)+" "+fmt.Sprint(module.id), "space")
+		module.sendToLink(module.addresses[i], "reqEntry "+fmt.Sprint(module.id)+" "+fmt.Sprint(module.lcl), "space")
 	}
 	module.st = wantMX
 
@@ -327,12 +339,12 @@ func (module *DIMEX_Module) handleUponReqExit() {
 	*/
 	for i := 0; i < len(module.waiting); i++ {
 		if module.waiting[i] {
-			module.sendToLink(module.addresses[i], "respOk", "respOk (reqExit) from "+strconv.Itoa(module.id))
+			module.sendToLink(module.addresses[i], "respOk "+fmt.Sprint(module.id), "respOk (reqExit) from "+strconv.Itoa(module.id))
 		}
 	}
 	module.st = noMX
 	module.waiting = make([]bool, len(module.addresses))
-	fmt.Printf("module.waiting = %v\n", module.waiting)
+	module.outDbg(fmt.Sprintf("module.waiting = %v\n", module.waiting))
 }
 
 // ------------------------------------------------------------------------------------
@@ -352,9 +364,9 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 
 	*/
 	module.nbrResps++
-	fmt.Printf("%d tem %d oks\n", module.id, module.nbrResps)
+	module.outDbg(fmt.Sprintf("%d tem %d oks\n", module.id, module.nbrResps))
 	if module.nbrResps == len(module.addresses)-1 {
-		fmt.Printf("%d pode entrar na seção crítica\n", module.id)
+		module.outDbg(fmt.Sprintf("%d pode entrar na seção crítica\n", module.id))
 		module.Ind <- dmxResp{}
 		module.st = inMX
 	}
@@ -376,8 +388,8 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 		     					lts.ts := max(lts.ts, rts.ts)
 	*/
 	// %GS: da onde vem o ID e timestamp do outro?
-	id_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[2])
-	lcl_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
+	id_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
+	lcl_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[2])
 	if err != nil {
 		println(err)
 	}
@@ -386,10 +398,10 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 	// println(id_do_outro)
 	if module.st == noMX ||
 		(module.st == wantMX && before(id_do_outro, lcl_do_outro, module.id, module.reqTs)) {
-		fmt.Printf("%d deixou %d passar na frente\n", module.id, id_do_outro)
-		module.sendToLink(module.addresses[id_do_outro], "respOk", "respOk (reqEntry) from "+strconv.Itoa(module.id))
+		module.outDbg(fmt.Sprintf("%d deixou %d passar na frente\n", module.id, id_do_outro))
+		module.sendToLink(module.addresses[id_do_outro], "respOk "+fmt.Sprint(module.id), "respOk (reqEntry) from "+strconv.Itoa(module.id))
 	} else {
-		fmt.Printf("%d NÃO deixou %d passar na frente\n", module.id, id_do_outro)
+		module.outDbg(fmt.Sprintf("%d NÃO deixou %d passar na frente\n", module.id, id_do_outro))
 		// %GS: Quase certo que não é necessário esse if mas como está no algoritmo fica por enquanto
 		if module.st == inMX || (module.st == wantMX && before(module.id, module.reqTs, id_do_outro, lcl_do_outro)) {
 			module.waiting[id_do_outro] = true
@@ -429,5 +441,10 @@ func before(oneId, oneTs, othId, othTs int) bool {
 func (module *DIMEX_Module) outDbg(s string) {
 	if module.dbg {
 		fmt.Println(". . . . . . . . . . . . [ DIMEX : " + s + " ]")
+	}
+}
+func (module *SnapShot_Module) outDbg(s string) {
+	if module.dbg {
+		fmt.Println(". . . . . . . . . . . . [ SNAPSHOT : " + s + " ]")
 	}
 }
