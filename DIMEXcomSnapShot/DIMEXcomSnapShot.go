@@ -272,10 +272,19 @@ func (module *SnapShot_Module) checkSnapshotEnd() {
 
 // %GS: Função só é chamada quando todos retornam, então se der postergação indefinida de um processo não vai ter snapshot...
 func (module *SnapShot_Module) writeSnapshot() {
-	module.file.WriteString()
+	module.file.WriteString(fmt.Sprintf("DIMEX_State: %d\n", module.DIMEX.st))
+	module.file.WriteString(fmt.Sprintf("lcl: %d\n", module.DIMEX.lcl))
+	module.file.WriteString(fmt.Sprintf("reqTs: %d\n", module.DIMEX.reqTs))
+	module.file.WriteString(fmt.Sprintf("nbrResps: %d\n", module.DIMEX.nbrResps))
+	module.file.WriteString("waiting: ")
+	for i := 0; i < len(module.received); i++ {
+		module.file.WriteString(fmt.Sprintf("%t ", module.ls.waiting[i]))
+	}
+
 	for i := 0; i < len(module.received); i++ {
 		module.file.WriteString(module.ls.channels[i])
 	}
+	module.file.WriteString("\n")
 }
 
 // ------------------------------------------------------------------------------------
