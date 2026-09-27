@@ -261,6 +261,7 @@ func (module *SnapShot_Module) checkSnapshotEnd() {
 	for i := 0; i < len(module.DIMEX.addresses); i++ {
 		module.received[i] = 0
 	}
+	module.isRecording = false
 	module.outDbg("Pronto pra próxima")
 }
 
