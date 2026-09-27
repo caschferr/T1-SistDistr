@@ -9,16 +9,17 @@ class SnapShot:
     waiting: str
     messages: str # ele não lê isso por enquanto
 
-    def __init__(self, _d, _l, _rt, _n, _rr, _w):
+    def __init__(self, _d, _l, _rt, _n, _rr, _w, _m):
         self.DIMEX_State = _d
         self.lcl = _l
         self.reqTs = _rt
         self.nbrResps = _n
         self.receivedResps = _rr
         self.waiting = _w
+        self.messages = _m
 
 regex = re.compile(
-    r"DIMEX_State: ([0-2])(?:\s*)lcl: ([0-9]+)(?:\s*)reqTs: ([0-9]+)(?:\s*)nbrResps: ([0-2])(?:\s*)receivedResps: \[(.*)\](?:\s*)waiting: (\w+ \w+ \w+)(?:\s*)messages in channels:(?:\s*)",
+    r"DIMEX_State: ([0-2])(?:\s*)lcl: ([0-9]+)(?:\s*)reqTs: ([0-9]+)(?:\s*)nbrResps: ([0-2])(?:\s*)receivedResps: \[(.*)\](?:\s*)waiting: \[(\w+ \w+ \w+)\](?:\s*)messages in channels: \[(.*)\](?:\s*)",
 )
 
 def process(file) -> list[SnapShot]:
@@ -28,7 +29,7 @@ def process(file) -> list[SnapShot]:
         l = re.findall(regex, text)
         #print(l)
         for snap in l:
-            snapshots.append(SnapShot(int(snap[0]),int(snap[1]),int(snap[2]),int(snap[3]),snap[4],snap[5]))
+            snapshots.append(SnapShot(int(snap[0]),int(snap[1]),int(snap[2]),int(snap[3]),snap[4],snap[5],snap[6]))
         return snapshots
 
 def test_dois_processos_na_secao_critica(s0,s1,s2):
