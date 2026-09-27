@@ -57,7 +57,7 @@ func NewPP2PLink(_address string, _dbg bool) *PP2PLink {
 
 func (module *PP2PLink) outDbg(s string) {
 	if module.dbg {
-		fmt.Println(". . . . . . . . . . . . . . . . . [ PP2PLink msg : " + s + " ]")
+		// fmt.Println(". . . . . . . . . . . . . . . . . [ PP2PLink msg : " + s + " ]")
 	}
 }
 

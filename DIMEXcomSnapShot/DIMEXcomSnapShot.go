@@ -113,9 +113,9 @@ func NewSnapShot_Module(_addresses []string, _id int, _dbg bool, _dbgDIMEX bool)
 	for i := 0; i < len(snp.received); i++ {
 		snp.received[i] = 0
 	}
-	fmt.Printf("len(dmx.addresses) = %d\n", len(dmx.addresses))
+	// fmt.Printf("len(dmx.addresses) = %d\n", len(dmx.addresses))
 	snp.Start()
-	snp.DIMEX.outDbg("Init DIMEX!")
+	// snp.DIMEX.outDbg("Init DIMEX!")
 	return snp
 }
 
@@ -130,13 +130,13 @@ func (module *SnapShot_Module) Start() {
 			select {
 			case dmxR := <-module.DIMEX.Req: // vindo da  aplicação
 				{
-					module.DIMEX.outDbg("dmxR recebeu module.Req")
+					// module.DIMEX.outDbg("dmxR recebeu module.Req")
 					if dmxR == ENTER {
-						module.DIMEX.outDbg("app pede mx")
+						// module.DIMEX.outDbg("app pede mx")
 						module.DIMEX.handleUponReqEntry() // ENTRADA DO ALGORITMO
 
 					} else if dmxR == EXIT {
-						module.DIMEX.outDbg("app libera mx")
+						// module.DIMEX.outDbg("app libera mx")
 						module.DIMEX.handleUponReqExit() // ENTRADA DO ALGORITMO
 					} else if dmxR == SNAPSHOT {
 						// %GS: devia fazer exatamente igual e mandar uma mensagem pra si mesmo, mas não sei se isso aqui funciona
@@ -159,17 +159,17 @@ func (module *SnapShot_Module) Start() {
 					}
 					//fmt.Printf("dimex recebe da rede: %s", msgOutro)
 					if strings.Contains(msgOutro.Message, "respOk") {
-						module.DIMEX.outDbg("         <<<---- responde! " + msgOutro.Message)
+						// module.DIMEX.outDbg("         <<<---- responde! " + msgOutro.Message)
 						module.DIMEX.handleUponDeliverRespOk(msgOutro) // ENTRADA DO ALGORITMO
 
 					} else if strings.Contains(msgOutro.Message, "reqEntry") {
-						module.DIMEX.outDbg("          <<<---- pede??  " + msgOutro.Message)
+						// module.DIMEX.outDbg("          <<<---- pede??  " + msgOutro.Message)
 						module.DIMEX.handleUponDeliverReqEntry(msgOutro) // ENTRADA DO ALGORITMO
 
 					} else if strings.Contains(msgOutro.Message, "takeSnapshot") {
-						module.outDbg("          <<<---- snapshot??  " + msgOutro.Message)
+						// module.outDbg("          <<<---- snapshot??  " + msgOutro.Message)
 						module.handleUponDeliverTakeSnapshot(msgOutro) // %GS: Entrada do snapshot
-						module.outDbg("Algo aconteceu")
+						// module.outDbg("Algo aconteceu")
 					}
 				}
 			}
@@ -202,12 +202,12 @@ Protocolo de Chandy-Lamport (retirado direto dos slides)
 */
 func (module *SnapShot_Module) handleUponDeliverTakeSnapshot(msgOutro PP2PLink.PP2PLink_Ind_Message) {
 	id_do_outro, err := strconv.Atoi(strings.Split(msgOutro.Message, " ")[1])
-	module.outDbg("Oi")
+	// module.outDbg("Oi")
 	if err != nil {
 		println(err)
 	}
 	if module.received[id_do_outro] == 0 {
-		module.outDbg("Iniciando uma snapshot")
+		// module.outDbg("Iniciando uma snapshot")
 		// É a primeira vez (pedido)
 		module.saveLocalState()
 		module.isRecording = true // %GS: passa a gravar mensagens nos canais
@@ -217,13 +217,13 @@ func (module *SnapShot_Module) handleUponDeliverTakeSnapshot(msgOutro PP2PLink.P
 				module.received[i] = 2 // Como não tem canal entre um processo e ele mesmo, só pula o estado 1
 				continue
 			}
-			module.outDbg("          requisita ---->>> " + msgOutro.Message)
+			// module.outDbg("          requisita ---->>> " + msgOutro.Message)
 			module.DIMEX.sendToLink(module.DIMEX.addresses[i], "takeSnapshot "+fmt.Sprint(module.DIMEX.id), "takeSnapshot from "+strconv.Itoa(module.DIMEX.id))
 			module.received[i] = 1
 		}
 		module.received[id_do_outro] = 2 // %GS: quem iniciou não vai responder, então não espera a resposta dele
 	} else if module.received[id_do_outro] == 1 {
-		module.outDbg("Mensagem de resposta recebida")
+		// module.outDbg("Mensagem de resposta recebida")
 		// Não é a primeira vez (resposta)
 		module.received[id_do_outro] = 2
 		module.checkSnapshotEnd()
@@ -246,26 +246,27 @@ func (module *SnapShot_Module) saveLocalState() {
 }
 
 func (module *SnapShot_Module) checkSnapshotEnd() {
-	module.outDbg("Verificando se acabou")
-	for i := 0; i < len(module.DIMEX.addresses); i++ {
-		module.outDbg(fmt.Sprintf("%d", module.received[i]))
-	}
+	// module.outDbg("Verificando se acabou")
+	// module.outDbg(fmt.Sprintf("%v", module.received))
+	// for i := 0; i < len(module.DIMEX.addresses); i++ {
+	// 	module.outDbg(fmt.Sprintf("%d", module.received[i]))
+	// }
 	for i := 0; i < len(module.DIMEX.addresses); i++ {
 		if module.received[i] != 2 {
-			module.outDbg("Não acabou")
+			// module.outDbg("Não acabou")
 			return
 		}
 	}
-	module.outDbg("Terminado uma snapshot, escrevendo...")
+	// module.outDbg("Terminado uma snapshot, escrevendo...")
 	// %GS: Se chegou aqui, então todos estão terminados
 	module.writeSnapshot()
-	module.outDbg("Escrito")
+	// module.outDbg("Escrito")
 	// %GS: reinicia tudo e espera o próximo ciclo
 	for i := 0; i < len(module.DIMEX.addresses); i++ {
 		module.received[i] = 0
 	}
 	module.isRecording = false
-	module.outDbg("Pronto pra próxima (" + strconv.Itoa(module.DIMEX.lcl) + ")")
+	// module.outDbg("Pronto pra próxima (" + strconv.Itoa(module.DIMEX.lcl) + " | " + strconv.Itoa(module.ls.lcl) + ")")
 }
 
 // %GS: Função só é chamada quando todos retornam, então se der postergação indefinida de um processo não vai ter snapshot...
@@ -326,7 +327,7 @@ func (module *DIMEX_Module) handleUponReqExit() {
 	}
 	module.st = noMX
 	module.waiting = make([]bool, len(module.addresses))
-	module.outDbg(fmt.Sprintf("module.waiting = %v\n", module.waiting))
+	// module.outDbg(fmt.Sprintf("module.waiting = %v\n", module.waiting))
 }
 
 // ------------------------------------------------------------------------------------
@@ -346,7 +347,6 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 
 	*/
 	if slices.Contains(module.receivedResps, msgOutro.From) || module.st != wantMX {
-		// %CF: mensagem de ok já recebida, ignora
 		return
 	}
 	module.nbrResps++
@@ -409,7 +409,7 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 // ------------------------------------------------------------------------------------
 
 func (module *DIMEX_Module) sendToLink(address string, content string, space string) {
-	module.outDbg(space + " ---->>>>   to: " + address + "     msg: " + content)
+	// module.outDbg(space + " ---->>>>   to: " + address + "     msg: " + content)
 	module.Pp2plink.Req <- PP2PLink.PP2PLink_Req_Message{
 		To:      address,
 		Message: content}
