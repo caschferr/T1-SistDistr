@@ -1,22 +1,3 @@
-/*  Construido como parte da disciplina: FPPD - PUCRS - Escola Politecnica
-    Professor: Fernando Dotti  (https://fldotti.github.io/)
-    Modulo representando Algoritmo de Exclusão Mútua Distribuída:
-    Semestre 2023/1
-	Aspectos a observar:
-	   mapeamento de módulo para estrutura
-	   inicializacao
-	   semantica de concorrência: cada evento é atômico
-	   							  módulo trata 1 por vez
-	Q U E S T A O
-	   Além de obviamente entender a estrutura ...
-	   Implementar o núcleo do algoritmo ja descrito, ou seja, o corpo das
-	   funcoes reativas a cada entrada possível:
-	   			handleUponReqEntry()  // recebe do nivel de cima (app)
-				handleUponReqExit()   // recebe do nivel de cima (app)
-				handleUponDeliverRespOk(msgOutro)   // recebe do nivel de baixo
-				handleUponDeliverReqEntry(msgOutro) // recebe do nivel de baixo
-*/
-
 package DIMEXcomSnapShot
 
 import (
@@ -50,16 +31,17 @@ type dmxResp struct { // mensagem do módulo DIMEX infrmando que pode acessar - 
 }
 
 type DIMEX_Module struct {
-	Req       chan dmxReq  // canal para receber pedidos da aplicacao (REQ e EXIT)
-	Ind       chan dmxResp // canal para informar aplicacao que pode acessar
-	addresses []string     // endereco de todos, na mesma ordem
-	id        int          // identificador do processo - é o indice no array de enderecos acima
-	st        State        // estado deste processo na exclusao mutua distribuida
-	waiting   []bool       // processos aguardando tem flag true
-	lcl       int          // relogio logico local
-	reqTs     int          // timestamp local da ultima requisicao deste processo
-	nbrResps  int
-	dbg       bool
+	Req           chan dmxReq  // canal para receber pedidos da aplicacao (REQ e EXIT)
+	Ind           chan dmxResp // canal para informar aplicacao que pode acessar
+	addresses     []string     // endereco de todos, na mesma ordem
+	id            int          // identificador do processo - é o indice no array de enderecos acima
+	st            State        // estado deste processo na exclusao mutua distribuida
+	waiting       []bool       // processos aguardando tem flag true
+	lcl           int          // relogio logico local
+	reqTs         int          // timestamp local da ultima requisicao deste processo
+	nbrResps      int
+	dbg           bool
+	receivedResps []string
 
 	Pp2plink *PP2PLink.PP2PLink // acesso aa comunicacao enviar por PP2PLinq.Req  e receber por PP2PLinq.Ind
 }
@@ -159,7 +141,6 @@ func (module *SnapShot_Module) Start() {
 						module.DIMEX.sendToLink(module.DIMEX.addresses[module.DIMEX.id], "takeSnapshot "+fmt.Sprint(module.DIMEX.id), "starting takeSnapshot")
 					}
 				}
-
 			case msgOutro := <-module.DIMEX.Pp2plink.Ind: // vindo de outro processo
 				{
 					if module.isRecording {
@@ -168,10 +149,11 @@ func (module *SnapShot_Module) Start() {
 							println(err)
 						}
 						if module.received[id_do_remetente] == 2 {
-							break // %GS: não grava se já recebeu a resposta desse remetente
+							// break // %GS: não grava se já recebeu a resposta desse remetente
+							module.ls.channels[id_do_remetente] += msgOutro.Message + ";\n"
 						}
 						// %GS: Salvando mensagem da forma mais básica possível
-						module.ls.channels[id_do_remetente] += msgOutro.Message + ";\n"
+						// module.ls.channels[id_do_remetente] += msgOutro.Message + ";\n"
 					}
 					//fmt.Printf("dimex recebe da rede: %s", msgOutro)
 					if strings.Contains(msgOutro.Message, "respOk") {
@@ -288,6 +270,7 @@ func (module *SnapShot_Module) writeSnapshot() {
 	module.file.WriteString(fmt.Sprintf("lcl: %d\n", module.DIMEX.lcl))
 	module.file.WriteString(fmt.Sprintf("reqTs: %d\n", module.DIMEX.reqTs))
 	module.file.WriteString(fmt.Sprintf("nbrResps: %d\n", module.DIMEX.nbrResps))
+	module.file.WriteString(fmt.Sprintf("receivedResps: %v\n", module.DIMEX.receivedResps))
 	module.file.WriteString("waiting: ")
 	for i := 0; i < len(module.received); i++ {
 		module.file.WriteString(fmt.Sprintf("%t ", module.ls.waiting[i]))
@@ -364,11 +347,13 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 
 	*/
 	module.nbrResps++
+	module.receivedResps = append(module.receivedResps, msgOutro.From)
 	module.outDbg(fmt.Sprintf("%d tem %d oks\n", module.id, module.nbrResps))
 	if module.nbrResps == len(module.addresses)-1 {
 		module.outDbg(fmt.Sprintf("%d pode entrar na seção crítica\n", module.id))
 		module.Ind <- dmxResp{}
 		module.st = inMX
+		module.receivedResps = make([]string, 10)
 	}
 
 }
