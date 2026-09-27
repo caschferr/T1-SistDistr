@@ -31,6 +31,7 @@ package main
 import (
 	"SD/DIMEXcomSnapShot"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -61,13 +62,13 @@ func main() {
 		return
 	}
 
-	logFile, err := os.OpenFile("./log.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	// logFile, err := os.OpenFile("./log.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 
-	if err != nil {
-		fmt.Println("Error opening logFile:", err)
-		return
-	}
-	defer logFile.Close()
+	// if err != nil {
+	// 	fmt.Println("Error opening logFile:", err)
+	// 	return
+	// }
+	// defer logFile.Close()
 	defer file.Close() // Ensure the file is closed at the end of the function
 
 	// espera para facilitar inicializacao de todos processos (a mao)
@@ -77,7 +78,7 @@ func main() {
 		// %GS: Tira um snapshot a cada 5 segundos, eu acho
 		if id == 0 {
 			for i := 0; i == i; {
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 				dmx.DIMEX.Req <- DIMEXcomSnapShot.SNAPSHOT
 			}
 		}
@@ -94,47 +95,50 @@ func main() {
 		// A PARTIR DAQUI ESTA ACESSANDO O ARQUIVO SOZINHO
 		// _, err = logFile.WriteString(strconv.Itoa(id) + " ")
 
-		// _, err := file.Seek(0, io.SeekEnd)
+		fmt.Println("[ APP id: ", id, " *EM*   MX ]")
+
+		_, err := file.Seek(-1, io.SeekEnd)
 		// if err != nil {
 		// 	panic("deu merda " + err.Error())
 		// }
-		// buf := make([]byte, 1)
-		// _, err = file.Read(buf)
+		buf := make([]byte, 1)
+		_, err = file.Read(buf)
 		// if err != nil && err != io.EOF {
 		// 	panic("deu merda 2 o retorno " + err.Error())
 		// }
-		// if string(buf[0]) == "|" {
-		// 	_, err = logFile.WriteString("\nREPEATED | FROM ID " + strconv.Itoa(id))
-		// 	if err != nil {
-		// 		fmt.Println("Could not write to logFile")
-		// 	}
-		// 	panic("REPEATED OUTPUT |")
-		// }
+		if string(buf[0]) == "|" {
+			dmx.DIMEX.Req <- DIMEXcomSnapShot.SNAPSHOT
+
+			// 	_, err = logFile.WriteString("\nREPEATED | FROM ID " + strconv.Itoa(id))
+			// 	if err != nil {
+			// 		fmt.Println("Could not write to logFile")
+			// 	}
+			panic("REPEATED OUTPUT |")
+		}
 
 		_, err = file.WriteString("|") // marca entrada no arquivo
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
 			return
 		}
-
-		fmt.Println("[ APP id: ", id, " *EM*   MX ]")
-
-		// _, err = file.Seek(-1, io.SeekEnd)
+		_, err = file.Seek(-1, io.SeekEnd)
 		// if err != nil {
 		// 	panic("deu merda " + err.Error())
 		// }
-		// buf = make([]byte, 1)
-		// _, err = file.Read(buf)
+		buf = make([]byte, 1)
+		_, err = file.Read(buf)
 		// if err != nil && err != io.EOF {
 		// 	panic("deu merda 2 o retorno " + err.Error())
 		// }
-		// if string(buf[0]) == "." {
-		// 	_, err = logFile.WriteString("\nREPEATED . FROM ID " + strconv.Itoa(id))
-		// 	if err != nil {
-		// 		fmt.Println("Could not write to logFile")
-		// 	}
-		// 	panic("REPEATED OUTPUT .")
-		// }
+		if string(buf[0]) == "." {
+			dmx.DIMEX.Req <- DIMEXcomSnapShot.SNAPSHOT
+
+			// 	_, err = logFile.WriteString("\nREPEATED . FROM ID " + strconv.Itoa(id))
+			// 	if err != nil {
+			// 		fmt.Println("Could not write to logFile")
+			// 	}
+			panic("REPEATED OUTPUT .")
+		}
 		_, err = file.WriteString(".") // marca saida no arquivo
 		if err != nil {
 			fmt.Println("Error writing to file:", err)

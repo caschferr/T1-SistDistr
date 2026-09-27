@@ -4,6 +4,7 @@ import (
 	PP2PLink "SD/PP2PLink"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -59,12 +60,13 @@ type SnapShot_Module struct { // GS: como modelar isso:
 }
 
 type localState struct { // GS: Um tipo para conter as informações que vão ser salvas na snapshot (incompleto?)
-	DIMEX_State State
-	lcl         int
-	reqTs       int
-	nbrResps    int
-	waiting     []bool
-	channels    []string
+	DIMEX_State   State
+	lcl           int
+	reqTs         int
+	nbrResps      int
+	receivedResps []string
+	waiting       []bool
+	channels      []string
 }
 
 // ------------------------------------------------------------------------------------
@@ -231,12 +233,13 @@ func (module *SnapShot_Module) handleUponDeliverTakeSnapshot(msgOutro PP2PLink.P
 
 func (module *SnapShot_Module) saveLocalState() {
 	ls := &localState{
-		DIMEX_State: module.DIMEX.st,
-		lcl:         module.DIMEX.lcl,
-		reqTs:       module.DIMEX.reqTs,
-		nbrResps:    module.DIMEX.nbrResps,
-		waiting:     module.DIMEX.waiting,
-		channels:    make([]string, len(module.DIMEX.addresses))}
+		DIMEX_State:   module.DIMEX.st,
+		lcl:           module.DIMEX.lcl,
+		reqTs:         module.DIMEX.reqTs,
+		nbrResps:      module.DIMEX.nbrResps,
+		receivedResps: module.DIMEX.receivedResps,
+		waiting:       module.DIMEX.waiting,
+		channels:      make([]string, len(module.DIMEX.addresses))}
 
 	module.ls = ls
 
@@ -262,24 +265,19 @@ func (module *SnapShot_Module) checkSnapshotEnd() {
 		module.received[i] = 0
 	}
 	module.isRecording = false
-	module.outDbg("Pronto pra próxima")
+	module.outDbg("Pronto pra próxima (" + strconv.Itoa(module.DIMEX.lcl) + ")")
 }
 
 // %GS: Função só é chamada quando todos retornam, então se der postergação indefinida de um processo não vai ter snapshot...
 func (module *SnapShot_Module) writeSnapshot() {
-	module.file.WriteString(fmt.Sprintf("DIMEX_State: %d\n", module.DIMEX.st))
-	module.file.WriteString(fmt.Sprintf("lcl: %d\n", module.DIMEX.lcl))
-	module.file.WriteString(fmt.Sprintf("reqTs: %d\n", module.DIMEX.reqTs))
-	module.file.WriteString(fmt.Sprintf("nbrResps: %d\n", module.DIMEX.nbrResps))
-	module.file.WriteString(fmt.Sprintf("receivedResps: %v\n", module.DIMEX.receivedResps))
-	module.file.WriteString("waiting: ")
-	for i := 0; i < len(module.received); i++ {
-		module.file.WriteString(fmt.Sprintf("%t ", module.ls.waiting[i]))
-	}
-	module.file.WriteString("\nmessages in channels: \n")
-	for i := 0; i < len(module.received); i++ {
-		module.file.WriteString(module.ls.channels[i])
-	}
+	module.file.WriteString(fmt.Sprintf("DIMEX_State: %d\n", module.ls.DIMEX_State))
+	module.file.WriteString(fmt.Sprintf("lcl: %d\n", module.ls.lcl))
+	module.file.WriteString(fmt.Sprintf("reqTs: %d\n", module.ls.reqTs))
+	module.file.WriteString(fmt.Sprintf("nbrResps: %d\n", module.ls.nbrResps))
+	module.file.WriteString(fmt.Sprintf("receivedResps: %v\n", module.ls.receivedResps))
+	module.file.WriteString(fmt.Sprintf("waiting: %v\n", module.ls.waiting))
+	chan_msgs := strings.ReplaceAll(fmt.Sprintf("%v", module.ls.channels), "\n", " ")
+	module.file.WriteString(fmt.Sprintf("messages in channels: %s\n", chan_msgs))
 	module.file.WriteString("\n")
 }
 
@@ -347,6 +345,10 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 		  					    estado := estouNaSC
 
 	*/
+	if slices.Contains(module.receivedResps, msgOutro.From) || module.st != wantMX {
+		// %CF: mensagem de ok já recebida, ignora
+		return
+	}
 	module.nbrResps++
 	module.receivedResps = append(module.receivedResps, msgOutro.From)
 	module.outDbg(fmt.Sprintf("%d tem %d oks\n", module.id, module.nbrResps))
@@ -354,7 +356,7 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 		module.outDbg(fmt.Sprintf("%d pode entrar na seção crítica\n", module.id))
 		module.Ind <- dmxResp{}
 		module.st = inMX
-		module.receivedResps = make([]string, 10)
+		module.receivedResps = make([]string, len(module.addresses))
 	}
 
 }
