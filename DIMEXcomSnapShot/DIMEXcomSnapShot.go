@@ -292,7 +292,7 @@ func (module *SnapShot_Module) writeSnapshot() {
 	for i := 0; i < len(module.received); i++ {
 		module.file.WriteString(fmt.Sprintf("%t ", module.ls.waiting[i]))
 	}
-	module.file.WriteString("waiting: \n")
+	module.file.WriteString("\nmessages in channels: \n")
 	for i := 0; i < len(module.received); i++ {
 		module.file.WriteString(module.ls.channels[i])
 	}
