@@ -60,7 +60,7 @@ def test_inv2(s0,s1,s2):
             if s0[i].waiting != [False, False, False] or s1[i].waiting != [False, False, False] or s2[i].waiting != [False, False, False]:
                 print("Violação da inv 2 por waiting")
             # Acho que mensagem do snapshot pode ativar esse caso...
-            if str.count(s0[i].messages, ';') > 0 or str.count(s1[i].messages, ';') > 0 or str.count(s2[i].messages, ';') > 0:
+            if len(s0[i].messages) > 0 or len(s1[i].messages) > 0 or len(s2[i].messages) > 0:
                 print("Violação da inv 2 por mensagens")
 
 #inv 3: se um processo q está marcado como waiting em p, então p está na SC ou quer a SC
@@ -68,15 +68,15 @@ def test_inv3(s:list[list[SnapShot]]):
     for i in range(len(s0)):
         for p in range(3):
             if s[0][i].waiting[p]:
-                if s[p][i].DIMEX_State == 0:
+                if s[0][i].DIMEX_State == 0:
                     print(f"Violação da inv 3 na snap {i} com o waiting do 0 discordando do DIMEX_State do {p}")
 
             if s[1][i].waiting[p]:
-                if s[p][i].DIMEX_State == 0:
+                if s[1][i].DIMEX_State == 0:
                     print(f"Violação da inv 3 na snap {i} com o waiting do 1 discordando do DIMEX_State do {p}")
 
             if s[2][i].waiting[p]:
-                if s[p][i].DIMEX_State == 0:
+                if s[2][i].DIMEX_State == 0:
                     print(f"Violação da inv 3 na snap {i} com o waiting do 2 discordando do DIMEX_State do {p}")
 
 #inv 4: se um processo q quer a seção crítica (nao entrou ainda),
@@ -100,7 +100,18 @@ def test_inv4(s0,s1,s2):
 # o somatório de mensagens recebidas, de mensagens em transito 
 # e de flags waiting para p em outros processos
 def inv4_internal(target,other1,other2, target_id):
-    return target.nbrResps + 1 if other1.waiting[target_id] else 0 + 1 if other2.waiting[target_id] else 0
+   sum = target.nbrResps
+   if other1.waiting[target_id]:
+       sum += 1
+   if other2.waiting[target_id]:
+       sum += 1
+   for i in range(3):
+       if i == target_id:
+           continue
+       if f"respOk {i};" in target.messages:
+           sum += 1
+   return sum
+   # return target.nbrResps + 1 if other1.waiting[target_id] else 0 + 1 if other2.waiting[target_id] else 0
 
 s0 = process("snapshots_0.txt")
 s1 = process("snapshots_1.txt")
