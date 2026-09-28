@@ -384,7 +384,7 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 	// println()
 	// println(lcl_do_outro)
 	// println(id_do_outro)
-	if module.st == noMX ||
+	if module.st == noMX || // Se o outro tem prioridade
 		(module.st == wantMX && before(id_do_outro, lcl_do_outro, module.id, module.reqTs)) {
 		module.outDbg(fmt.Sprintf("%d deixou %d passar na frente\n", module.id, id_do_outro))
 		module.sendToLink(module.addresses[id_do_outro], "respOk "+fmt.Sprint(module.id), "respOk (reqEntry) from "+strconv.Itoa(module.id))
@@ -398,9 +398,9 @@ func (module *DIMEX_Module) handleUponDeliverReqEntry(msgOutro PP2PLink.PP2PLink
 		//module.lcl = int(math.Max(float64(module.lcl), float64(lcl_do_outro)))
 
 		// %GS: reescrevendo a mesma coisa mas sem as conversões pra float e int
-		if module.lcl > lcl_do_outro {
-			module.lcl = lcl_do_outro
-		}
+	}
+	if module.lcl < lcl_do_outro {
+		module.lcl = lcl_do_outro
 	}
 }
 
