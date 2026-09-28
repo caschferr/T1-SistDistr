@@ -43,7 +43,7 @@ func main() {
 
 	fmt.Printf("----- ID %d -----\n", id)
 
-	// logFile, err := os.OpenFile("./log.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
+	logFile, err := os.OpenFile("./log.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 
 	// if err != nil {
 	// 	fmt.Println("Error opening logFile:", err)
@@ -74,7 +74,7 @@ func main() {
 		<-dmx.DIMEX.Ind //
 
 		// A PARTIR DAQUI ESTA ACESSANDO O ARQUIVO SOZINHO
-		// _, err = logFile.WriteString(strconv.Itoa(id) + " ")
+		_, err = logFile.WriteString(strconv.Itoa(id))
 
 		// fmt.Println("[ APP id: ", id, " *EM*   MX ]")
 
@@ -96,6 +96,10 @@ func main() {
 			// 		fmt.Println("Could not write to logFile")
 			// 	}
 			fmt.Printf("[%d] REPEATED OUTPUT |\n", id)
+			_, err = logFile.Seek(-1, io.SeekEnd)
+			logBuf := make([]byte, 1)
+			fmt.Println("- lastWriterId: " + strconv.Itoa(int(logBuf[0])))
+			dmx.DIMEX.Req <- DIMEXcomSnapShot.ERRO
 		}
 
 		_, err = file.WriteString("|") // marca entrada no arquivo
@@ -121,6 +125,10 @@ func main() {
 			// 		fmt.Println("Could not write to logFile")
 			// 	}
 			fmt.Printf("[%d] REPEATED OUTPUT .\n", id)
+			_, err = logFile.Seek(-1, io.SeekEnd)
+			logBuf := make([]byte, 1)
+			fmt.Println("- lastWriterId: " + strconv.Itoa(int(logBuf[0])))
+			dmx.DIMEX.Req <- DIMEXcomSnapShot.ERRO
 		}
 		_, err = file.WriteString(".") // marca saida no arquivo
 		if err != nil {

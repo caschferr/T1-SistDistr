@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ------------------------------------------------------------------------------------
@@ -25,6 +26,7 @@ const (
 	ENTER dmxReq = iota
 	EXIT
 	SNAPSHOT // %GS: adicionando para pedir um snapshot
+	ERRO     // %CF: remover depois, só para teste
 )
 
 type dmxResp struct { // mensagem do módulo DIMEX infrmando que pode acessar - pode ser somente um sinal (vazio)
@@ -141,6 +143,8 @@ func (module *SnapShot_Module) Start() {
 					} else if dmxR == SNAPSHOT {
 						// %GS: devia fazer exatamente igual e mandar uma mensagem pra si mesmo, mas não sei se isso aqui funciona
 						module.DIMEX.sendToLink(module.DIMEX.addresses[module.DIMEX.id], "takeSnapshot "+fmt.Sprint(module.DIMEX.id), "starting takeSnapshot")
+					} else if dmxR == ERRO {
+						module.handleErro()
 					}
 				}
 			case msgOutro := <-module.DIMEX.Pp2plink.Ind: // vindo de outro processo
@@ -170,11 +174,25 @@ func (module *SnapShot_Module) Start() {
 						// module.outDbg("          <<<---- snapshot??  " + msgOutro.Message)
 						module.handleUponDeliverTakeSnapshot(msgOutro) // %GS: Entrada do snapshot
 						// module.outDbg("Algo aconteceu")
-					}
+					} // else if strings.Contains(msgOutro.Message, "erro") {
+					// 	module.handleErro()
+					// }
 				}
 			}
 		}
 	}()
+}
+
+func (module *SnapShot_Module) handleErro() {
+	fmt.Println("- status: " + fmt.Sprintf("%d", module.DIMEX.st))
+	fmt.Println("- lcl: " + strconv.Itoa(module.DIMEX.lcl))
+	fmt.Println("- reqTs: " + strconv.Itoa(module.DIMEX.reqTs))
+	fmt.Println("- waiting: " + fmt.Sprintf("%v", module.DIMEX.waiting))
+	fmt.Println("- nbrResps: " + strconv.Itoa(module.DIMEX.nbrResps))
+	fmt.Println("- receivedResps: " + fmt.Sprintf("%v", module.DIMEX.receivedResps))
+	fmt.Println("- time.Now(): " + time.Now().Format("15:04:05.00000"))
+
+	fmt.Println()
 }
 
 // ------------------------------------------------------------------------------------
@@ -302,6 +320,8 @@ func (module *DIMEX_Module) handleUponReqEntry() {
 	module.lcl++
 	module.reqTs = module.lcl
 	module.nbrResps = 0
+	module.receivedResps = make([]string, len(module.addresses))
+
 	for i := 0; i < len(module.addresses); i++ {
 		if i == module.id {
 			continue
@@ -356,7 +376,7 @@ func (module *DIMEX_Module) handleUponDeliverRespOk(msgOutro PP2PLink.PP2PLink_I
 		module.outDbg(fmt.Sprintf("%d pode entrar na seção crítica\n", module.id))
 		module.Ind <- dmxResp{}
 		module.st = inMX
-		module.receivedResps = make([]string, len(module.addresses))
+		// module.receivedResps = make([]string, len(module.addresses))
 	}
 
 }
