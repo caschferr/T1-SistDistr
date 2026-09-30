@@ -108,7 +108,7 @@ def inv4_internal(target,other1,other2, target_id):
    for i in range(3):
        if i == target_id:
            continue
-       if f"respOk {i};" in target.messages:
+       if f"respOk {i}" in target.messages:
            sum += 1
    return sum
    # return target.nbrResps + 1 if other1.waiting[target_id] else 0 + 1 if other2.waiting[target_id] else 0
